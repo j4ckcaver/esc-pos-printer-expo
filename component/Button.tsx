@@ -1,14 +1,6 @@
 import type React from "react"
-import {
-    TouchableOpacity,
-    Text,
-    StyleSheet,
-    ActivityIndicator,
-    View,
-    type ViewStyle,
-    type TextStyle,
-} from "react-native"
-import { useTheme } from "../context/ThemeContext"
+import { TouchableOpacity, Text, StyleSheet, ActivityIndicator, View, type ViewStyle, type TextStyle, } from "react-native"
+import { useTheme } from "@/context/ThemeContext"
 
 interface ButtonProps {
     title: string

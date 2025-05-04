@@ -1,9 +1,7 @@
-"use client"
-
 import type React from "react"
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native"
 import { Feather } from "@expo/vector-icons"
-import { useTheme } from "../context/ThemeContext"
+import { useTheme } from "@/context/ThemeContext"
 
 interface PrinterItemProps {
     printer: {
