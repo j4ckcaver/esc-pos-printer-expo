@@ -1,9 +1,9 @@
 {
     "expo": {
-        "name": "Aargon",
-        "slug": "aargon",
+        "name": "esc-pos-printer-expo",
+        "slug": "esc-pos-printer-expo",
         "version": "1.0.0",
-        "scheme": "aargon",
+        "scheme": "my-app",
         "newArchEnabled": true,
         "orientation": "portrait",
         "userInterfaceStyle": "automatic",
