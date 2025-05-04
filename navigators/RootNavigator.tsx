@@ -2,9 +2,10 @@ import * as React from 'react';
 import { type NavigationProp } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import HomeScreen from '@/screens/HomeScreen';
+import PrintScreen from '@/screens/PrintScreen';
 import PrinterDetailsScreen from '@/screens/PrinterDetailsScreen';
 import PrinterSearchScreen from '@/screens/PrinterSearchScreen';
-import PrintScreen from '@/screens/PrintScreen';
+import ThemeToggleButton from '@/component/common/ThemeToggleButton';
 
 export type ScreenNames = ['Home', 'PrinterSearch', "PrinterDetails", "Print"];
 
@@ -41,7 +42,10 @@ const RootNavigator = () => {
             <Stack.Screen
                 name="Home"
                 component={HomeScreen}
-                options={{ title: "Thermal Printer" }}
+                options={({ navigation }) => ({
+                    title: "Thermal Printer",
+                    headerRight: () => <ThemeToggleButton />,
+                })}
             />
 
             <Stack.Screen
