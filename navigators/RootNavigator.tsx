@@ -2,14 +2,17 @@ import * as React from 'react';
 import { type NavigationProp } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import HomeScreen from '@/screens/HomeScreen';
+import PrinterDetailsScreen from '@/screens/PrinterDetailsScreen';
+import PrinterSearchScreen from '@/screens/PrinterSearchScreen';
+import PrintScreen from '@/screens/PrintScreen';
 
-export type ScreenNames = ['Home', 'PrinterSearch',"PrinterDetails","Print"];
+export type ScreenNames = ['Home', 'PrinterSearch', "PrinterDetails", "Print"];
 
 export type RootStackParamList = {
     Home: undefined;
     PrinterSearch: undefined;
-    PrinterDetails: undefined;
-    Print: undefined;
+    PrinterDetails: any;
+    Print: any;
 };
 
 export type StackNavigation = NavigationProp<RootStackParamList>;
