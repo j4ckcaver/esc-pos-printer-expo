@@ -9,8 +9,11 @@ const ThemeToggleButton = () => {
         <TouchableOpacity
             onPress={toggleTheme}
             style={{
-                padding: 8,
-                marginRight: 8,
+                width: 40,
+                height: 40,
+                borderRadius: 20,
+                justifyContent: "center",
+                alignItems: "center"
             }}
         >
             <Feather
