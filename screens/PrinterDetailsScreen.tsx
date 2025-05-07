@@ -1,83 +1,81 @@
-"use client"
-
 import type React from "react"
-import { useState, useEffect } from "react"
-import { View, Text, StyleSheet, ScrollView } from "react-native"
+import { useMemo, useState } from "react"
+import { View, Text, StyleSheet, ScrollView, Alert } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
-import { useNavigation, useRoute } from "@react-navigation/native"
 import { Feather } from "@expo/vector-icons"
 import { useTheme } from "@/context/ThemeContext"
 import Button from "@/component/Button"
 import type { StackNavigation } from "@/navigators/RootNavigator"
+import { Printer, PrinterConstants, type DeviceInfo } from "react-native-esc-pos-printer"
 
-const PrinterDetailsScreen = () => {
-    const navigation = useNavigation<StackNavigation>();
-    const route = useRoute()
-    const { theme } = useTheme()
-    const [isConnecting, setIsConnecting] = useState(false)
-    const [isConnected, setIsConnected] = useState(false)
-    const [printerInfo, setPrinterInfo] = useState<any>({})
+const PrinterDetailsScreen = ({ route, navigation }: { route: any, navigation: StackNavigation }) => {
+    const { theme } = useTheme();
+    const printer: DeviceInfo = route.params.printer
+    const [isConnecting, setIsConnecting] = useState(false);
+    const [isConnected, setIsConnected] = useState(false);
 
-    // Get printer from route params
-    useEffect(() => {
-        if (route.params && (route.params as any).printer) {
-            setPrinterInfo((route.params as any).printer)
-        }
-    }, [route.params])
+    const printerInstance = useMemo(() => {
+        return new Printer({
+            target: printer.target,
+            deviceName: printer.deviceName
+        });
+    }, [printer]);
 
-    const connectToPrinter = () => {
-        setIsConnecting(true)
+    const connectToPrinter = async () => {
+        setIsConnecting(true);
 
         // Simulate connection
-        setTimeout(() => {
-            setIsConnected(true)
-            setIsConnecting(false)
+        try {
+            await printerInstance.addQueueTask(async () => {
+                await printerInstance.connect();
+                const status = await printerInstance.getStatus();
+                const isConnected = status.connection.statusCode === PrinterConstants.TRUE;
+                setIsConnected(isConnected);
+                await printerInstance.addTextAlign(PrinterConstants.ALIGN_CENTER);
+                await printerInstance.addTextSize({ width: 1, height: 1 });
+                await printerInstance.addText('Printer Connected Successfully!');
+                await printerInstance.addFeedLine(2);
 
-            // Update printer info
-            setPrinterInfo((prev:any) => ({
-                ...prev,
-                connected: true,
-                status: "Ready",
-                paperWidth: "80mm",
-                dpi: "203 dpi",
-                firmware: "v1.2.3",
-            }))
-        }, 1500)
+                // Line Separator
+                await printerInstance.addText('-'.repeat(32));
+                await printerInstance.addFeedLine();
 
-        // In a real app, you would use the react-native-esc-pos-printer SDK:
-        // try {
-        //   await EscPosPrinter.connect(printerInfo.address);
-        //   const status = await EscPosPrinter.getStatus();
-        //   setPrinterInfo(prev => ({
-        //     ...prev,
-        //     connected: true,
-        //     status: status.ready ? 'Ready' : 'Error',
-        //     paperWidth: status.paperWidth,
-        //     dpi: status.dpi,
-        //     firmware: status.firmware,
-        //   }));
-        // } catch (error) {
-        //   Alert.alert('Connection Error', 'Failed to connect to printer');
-        // } finally {
-        //   setIsConnecting(false);
-        // }
+                await printerInstance.addTextSize({ width: 1, height: 1 });
+                await printerInstance.addText(
+                    `Device Name: ${printer.deviceName} \n Mac address: ${printer.macAddress ? printer.macAddress : 'Not found'
+                    } \n Target: ${printer.target} \n`,
+                );
+                await printerInstance.addFeedLine();
+
+                // Line Separator
+                await printerInstance.addText('-'.repeat(32));
+                await printerInstance.addFeedLine(2);
+
+                await printerInstance.addTextAlign(PrinterConstants.ALIGN_CENTER);
+                await printerInstance.addTextSize({ width: 2, height: 2 });
+                await printerInstance.addText('WELCOME!');
+                await printerInstance.addFeedLine(3);
+
+                await printerInstance.addCut();
+                await printerInstance.sendData();
+
+                await printerInstance.disconnect();
+            });
+        } catch (error) {
+            await printerInstance.disconnect();
+            Alert.alert("Printer Error", "Printing failed");
+        }
     }
 
     const disconnectPrinter = () => {
         // Simulate disconnection
-        setIsConnected(false)
-        setPrinterInfo((prev:any) => ({
-            ...prev,
-            connected: false,
-        }))
-
-        // In a real app:
-        // await EscPosPrinter.disconnect();
-    }
+        setIsConnected(false);
+        setIsConnecting(false);
+    };
 
     const navigateToPrint = () => {
-        navigation.navigate("Print", { printer: printerInfo })
-    }
+        navigation.navigate("Print", { printer })
+    };
 
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
@@ -85,12 +83,19 @@ const PrinterDetailsScreen = () => {
                 <View style={[styles.printerCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
                     <View style={styles.printerHeader}>
                         <View style={[styles.iconContainer, { backgroundColor: theme.primary + "15" }]}>
-                            <Feather name="printer" size={32} color={theme.primary} />
+                            <Feather
+                                name="printer"
+                                size={32}
+                                color={theme.primary}
+                            />
                         </View>
+
                         <View style={styles.printerInfo}>
-                            <Text style={[styles.printerName, { color: theme.text }]}>{printerInfo.name || "Printer"}</Text>
+                            <Text style={[styles.printerName, { color: theme.text }]}>
+                                {printer?.deviceName || "Printer"}
+                            </Text>
                             <Text style={[styles.printerAddress, { color: theme.text + "99" }]}>
-                                {printerInfo.address || "Unknown Address"}
+                                {printer?.target || "Unknown Address"}
                             </Text>
                             <View style={styles.statusContainer}>
                                 <View
@@ -106,18 +111,17 @@ const PrinterDetailsScreen = () => {
 
                 {isConnected && (
                     <View style={[styles.detailsCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-                        <Text style={[styles.sectionTitle, { color: theme.text }]}>Printer Details</Text>
+                        <Text style={[styles.sectionTitle, { color: theme.text }]}>
+                            Printer Details
+                        </Text>
 
                         <View style={styles.detailsGrid}>
-                            <DetailItem icon="check-circle" label="Status" value={printerInfo.status || "Unknown"} theme={theme} />
                             <DetailItem
-                                icon="maximize"
-                                label="Paper Width"
-                                value={printerInfo.paperWidth || "Unknown"}
+                                icon="check-circle"
+                                label="Status"
+                                value="Connected"
                                 theme={theme}
                             />
-                            <DetailItem icon="grid" label="Resolution" value={printerInfo.dpi || "Unknown"} theme={theme} />
-                            <DetailItem icon="code" label="Firmware" value={printerInfo.firmware || "Unknown"} theme={theme} />
                         </View>
                     </View>
                 )}
@@ -132,8 +136,18 @@ const PrinterDetailsScreen = () => {
                         />
                     ) : (
                         <>
-                            <Button title="Print Document" onPress={navigateToPrint} style={styles.actionButton} />
-                            <Button title="Disconnect" onPress={disconnectPrinter} variant="outline" style={styles.actionButton} />
+                            <Button
+                                title="Print Document"
+                                onPress={navigateToPrint}
+                                style={styles.actionButton}
+                            />
+
+                            <Button
+                                title="Disconnect"
+                                onPress={disconnectPrinter}
+                                variant="outline"
+                                style={styles.actionButton}
+                            />
                         </>
                     )}
                 </View>
@@ -153,10 +167,26 @@ const DetailItem: React.FC<DetailItemProps> = ({ icon, label, value, theme }) =>
     return (
         <View style={styles.detailItem}>
             <View style={[styles.detailIconContainer, { backgroundColor: theme.primary + "15" }]}>
-                <Feather name={icon} size={16} color={theme.primary} />
+                <Feather
+                    name={icon}
+                    size={16}
+                    color={theme.primary}
+                />
             </View>
-            <Text style={[styles.detailLabel, { color: theme.text + "99" }]}>{label}</Text>
-            <Text style={[styles.detailValue, { color: theme.text }]}>{value}</Text>
+            <Text
+                style={[styles.detailLabel, {
+                    color: theme.text + "99"
+                }]}
+            >
+                {label}
+            </Text>
+            <Text
+                style={[styles.detailValue, {
+                    color: theme.text
+                }]}
+            >
+                {value}
+            </Text>
         </View>
     )
 }

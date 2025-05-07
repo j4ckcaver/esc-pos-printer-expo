@@ -6,13 +6,14 @@ import PrintScreen from '@/screens/PrintScreen';
 import PrinterDetailsScreen from '@/screens/PrinterDetailsScreen';
 import PrinterSearchScreen from '@/screens/PrinterSearchScreen';
 import ThemeToggleButton from '@/component/common/ThemeToggleButton';
+import type { DeviceInfo } from 'react-native-esc-pos-printer';
 
 export type ScreenNames = ['Home', 'PrinterSearch', "PrinterDetails", "Print"];
 
 export type RootStackParamList = {
     Home: undefined;
     PrinterSearch: undefined;
-    PrinterDetails: any;
+    PrinterDetails: { printer: DeviceInfo };
     Print: any;
 };
 

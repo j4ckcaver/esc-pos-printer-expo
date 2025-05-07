@@ -7,78 +7,48 @@ import Button from "@/component/Button"
 import EmptyState from "@/component/EmptyState"
 import PrinterItem from "@/component/PrinterItem"
 import type { StackNavigation } from "@/navigators/RootNavigator"
-
-// Mock data for printers
-const mockPrinters = [
-    {
-        id: "1",
-        name: "Epson TM-T20III",
-        address: "BT:00:11:22:33:44:55",
-        connected: false,
-    },
-    {
-        id: "2",
-        name: "Star TSP100",
-        address: "BT:AA:BB:CC:DD:EE:FF",
-        connected: false,
-    },
-    {
-        id: "3",
-        name: "Zebra ZD410",
-        address: "BT:12:34:56:78:90:AB",
-        connected: false,
-    },
-]
+import { DiscoveryFilterOption, type DeviceInfo, usePrintersDiscovery } from 'react-native-esc-pos-printer';
 
 const PrinterSearchScreen = () => {
-    const navigation = useNavigation<StackNavigation>()
+    const { navigate } = useNavigation<StackNavigation>()
     const { theme } = useTheme()
-    const [printers, setPrinters] = useState<typeof mockPrinters>([])
-    const [isSearching, setIsSearching] = useState(false)
+    const { start, printers, isDiscovering } = usePrintersDiscovery();
     const [hasSearched, setHasSearched] = useState(false)
 
-    const searchPrinters = () => {
-        setIsSearching(true)
-        setHasSearched(true)
-
-        // Simulate printer discovery
-        setTimeout(() => {
-            setPrinters(mockPrinters)
-            setIsSearching(false)
-        }, 2000)
-
-        // In a real app, you would use the react-native-esc-pos-printer SDK:
-        // try {
-        //   const devices = await EscPosPrinter.discover();
-        //   setPrinters(devices);
-        // } catch (error) {
-        //   Alert.alert('Error', 'Failed to discover printers');
-        // } finally {
-        //   setIsSearching(false);
-        // }
-    }
-
-    const handlePrinterSelect = (printer: (typeof mockPrinters)[0]) => {
-        navigation.navigate("PrinterDetails", { printer })
-    }
-
     useEffect(() => {
-        // Start searching automatically when the screen loads
-        searchPrinters()
-    }, [])
+        searchPrinters();
+    }, []);
+
+    const handlePrinterSelect = (printer: DeviceInfo) => {
+        navigate("PrinterDetails", { printer })
+    };
+
+    const searchPrinters = () => {
+        try {
+            start({
+                timeout: 5000,
+                filterOption: {
+                    deviceModel: DiscoveryFilterOption.MODEL_ALL
+                },
+            });
+            setHasSearched(true);
+        } catch (error) {
+            console.error('Error starting printer discovery:', error);
+        }
+    };
 
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
             <View style={styles.searchContainer}>
                 <Button
-                    title={isSearching ? "Searching..." : "Refresh Search"}
+                    title={isDiscovering ? "Searching..." : "Refresh Search"}
                     onPress={searchPrinters}
-                    loading={isSearching}
+                    loading={isDiscovering}
                     style={styles.searchButton}
                 />
             </View>
 
-            {hasSearched && printers.length === 0 && !isSearching ? (
+            {hasSearched && printers.length === 0 && !isDiscovering ? (
                 <EmptyState
                     icon="printer"
                     title="No Printers Found"
@@ -89,11 +59,11 @@ const PrinterSearchScreen = () => {
             ) : (
                 <FlatList
                     data={printers}
-                    keyExtractor={(item) => item.id}
+                    keyExtractor={(item) => item?.target}
                     renderItem={({ item }) => <PrinterItem printer={item} onPress={() => handlePrinterSelect(item)} />}
                     contentContainerStyle={styles.listContent}
                     ListEmptyComponent={
-                        isSearching ? (
+                        isDiscovering ? (
                             <EmptyState icon="search" title="Searching for Printers" description="This may take a moment..." />
                         ) : null
                     }
@@ -101,7 +71,7 @@ const PrinterSearchScreen = () => {
             )}
         </SafeAreaView>
     )
-}
+};
 
 const styles = StyleSheet.create({
     container: {

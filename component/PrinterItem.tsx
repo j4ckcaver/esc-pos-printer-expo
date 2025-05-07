@@ -2,39 +2,53 @@ import type React from "react"
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native"
 import { Feather } from "@expo/vector-icons"
 import { useTheme } from "@/context/ThemeContext"
+import type { DeviceInfo } from "react-native-esc-pos-printer"
 
 interface PrinterItemProps {
-    printer: {
-        id: string
-        name: string
-        address: string
-        connected: boolean
-    }
-    onPress: () => void
+    printer: DeviceInfo;
+    onPress: () => void;
 }
 
 const PrinterItem: React.FC<PrinterItemProps> = ({ printer, onPress }) => {
-    const { theme } = useTheme()
+    const { theme } = useTheme();
 
     return (
         <TouchableOpacity
-            style={[styles.container, { backgroundColor: theme.card, borderColor: theme.border }]}
+            style={[styles.container, {
+                backgroundColor: theme.card,
+                borderColor: theme.border
+            }]}
             onPress={onPress}
         >
             <View style={styles.iconContainer}>
-                <Feather name="printer" size={24} color={printer.connected ? theme.success : theme.primary} />
+                <Feather
+                    name="printer"
+                    size={24}
+                    color={printer.target ? theme.success : theme.primary}
+                />
             </View>
+
             <View style={styles.infoContainer}>
-                <Text style={[styles.name, { color: theme.text }]}>{printer.name}</Text>
-                <Text style={[styles.address, { color: theme.text + "99" }]}>{printer.address}</Text>
-            </View>
-            <View style={styles.statusContainer}>
-                <View style={[styles.statusIndicator, { backgroundColor: printer.connected ? theme.success : theme.border }]} />
-                <Text style={[styles.statusText, { color: printer.connected ? theme.success : theme.text + "99" }]}>
-                    {printer.connected ? "Connected" : "Disconnected"}
+                <Text style={[styles.name, { color: theme.text }]}>
+                    {printer?.deviceName}
+                </Text>
+                <Text style={[styles.address, { color: theme.text + "99" }]}>
+                    {printer?.target}
                 </Text>
             </View>
-            <Feather name="chevron-right" size={20} color={theme.text + "66"} />
+
+            {/* <View style={styles.statusContainer}>
+                <View style={[styles.statusIndicator, { backgroundColor: printer.target ? theme.success : theme.border }]} />
+                <Text style={[styles.statusText, { color: printer.target ? theme.success : theme.text + "99" }]}>
+                    {printer.target ? "Connected" : "Disconnected"}
+                </Text>
+            </View> */}
+
+            <Feather
+                name="chevron-right"
+                size={20}
+                color={theme.text + "66"}
+            />
         </TouchableOpacity>
     )
 }

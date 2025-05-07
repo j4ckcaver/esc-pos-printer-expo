@@ -1,27 +1,31 @@
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { View, Text, StyleSheet, ScrollView, TextInput, Alert } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
-import { useRoute } from "@react-navigation/native"
 import { Feather } from "@expo/vector-icons"
 import { useTheme } from "@/context/ThemeContext"
 import Button from "@/component/Button"
+import { Printer, PrinterConstants, type DeviceInfo } from "react-native-esc-pos-printer"
 
-const PrintScreen = () => {
-    const route = useRoute()
-    const { theme } = useTheme()
-    const [isPrinting, setIsPrinting] = useState(false)
-    const [receiptTitle, setReceiptTitle] = useState("My Store")
+const PrintScreen = ({ navigation, route }: { navigation: any; route: any }) => {
+    const printer: DeviceInfo = route.params.printer;
+    const { theme } = useTheme();
+    const [isPrinting, setIsPrinting] = useState(false);
+
+    const [receiptTitle, setReceiptTitle] = useState("My Store");
     const [receiptItems, setReceiptItems] = useState([
         { name: "Product 1", price: "9.99", quantity: 1 },
         { name: "Product 2", price: "15.50", quantity: 2 },
-    ])
-    const [newItemName, setNewItemName] = useState("")
-    const [newItemPrice, setNewItemPrice] = useState("")
-    const [newItemQuantity, setNewItemQuantity] = useState("1")
+    ]);
+    const [newItemName, setNewItemName] = useState("");
+    const [newItemPrice, setNewItemPrice] = useState("");
+    const [newItemQuantity, setNewItemQuantity] = useState("1");
 
-    // Get printer from route params
-    const printerInfo =
-        route.params && (route.params as any).printer ? (route.params as any).printer : { name: "Unknown Printer" }
+    const printerInstance = useMemo(() => {
+        return new Printer({
+            target: printer.target,
+            deviceName: printer.deviceName
+        });
+    }, [printer]);
 
     const addItem = () => {
         if (!newItemName || !newItemPrice) {
@@ -37,13 +41,13 @@ const PrintScreen = () => {
         setNewItemName("")
         setNewItemPrice("")
         setNewItemQuantity("1")
-    }
+    };
 
     const removeItem = (index: number) => {
         const updatedItems = [...receiptItems]
         updatedItems.splice(index, 1)
         setReceiptItems(updatedItems)
-    }
+    };
 
     const calculateTotal = () => {
         return receiptItems
@@ -51,64 +55,84 @@ const PrintScreen = () => {
                 return total + Number.parseFloat(item.price) * item.quantity
             }, 0)
             .toFixed(2)
-    }
+    };
 
-    const printReceipt = () => {
-        setIsPrinting(true)
+    const printReceipt = async () => {
+        setIsPrinting(true);
 
-        // Simulate printing
-        setTimeout(() => {
+        try {
+            const res = await printerInstance.addQueueTask(async () => {
+                await Printer.tryToConnectUntil(
+                    printerInstance,
+                    status => status.online.statusCode === PrinterConstants.TRUE,
+                );
+
+                // header
+                await printerInstance.addTextSmooth(PrinterConstants.TRUE);
+                await printerInstance.addTextAlign(PrinterConstants.ALIGN_LEFT);
+                await printerInstance.addTextStyle({ em: PrinterConstants.TRUE } as const);
+                await printerInstance.addTextSize({ width: 2, height: 2 });
+                await printerInstance.addText(receiptTitle);
+                await printerInstance.addFeedLine(2);
+
+                await printerInstance.addTextStyle({ em: PrinterConstants.FALSE } as const);
+                await printerInstance.addTextSize({ width: 1, height: 1 });
+                await printerInstance.addText("Address here");
+                await printerInstance.addFeedLine(2);
+
+                // Item Details
+                for (const item of receiptItems) {
+                    await printerInstance.addTextStyle({ em: PrinterConstants.TRUE } as const);
+                    await Printer.addTextLine(printerInstance, {
+                        left: `${item.name} x${item.quantity}`,
+                        right: `$${item.price}`,
+                    });
+                }
+
+                await printerInstance.addFeedLine(2);
+
+                await printerInstance.addTextAlign(PrinterConstants.ALIGN_CENTER);
+                await printerInstance.addTextSize({ width: 1, height: 1 });
+                await printerInstance.addText(`Total: $${calculateTotal()}`);
+                await printerInstance.addFeedLine(2);
+
+                await printerInstance.addTextAlign(PrinterConstants.ALIGN_CENTER);
+                await printerInstance.addTextSize({ width: 1, height: 1 });
+                await printerInstance.addText("Thank you!");
+                await printerInstance.addFeedLine(2);
+
+                await printerInstance.addTextAlign(PrinterConstants.ALIGN_CENTER);
+                await printerInstance.addTextSize({ width: 1, height: 1 });
+                await printerInstance.addText("Powered by React Native Esc Pos Printer");
+                await printerInstance.addFeedLine(2);
+
+                // Cut Paper
+                await printerInstance.addCut();
+
+                const result = await printerInstance.sendData();
+                await printerInstance.disconnect();
+                return result;
+            });
+
+            if (res) {
+                Alert.alert("Success", "Receipt printed successfully");
+            }
+        } catch (e) {
+            await printerInstance.disconnect();
+            Alert.alert('Error', 'Printing failed');
+        } finally {
             setIsPrinting(false)
-            Alert.alert("Success", "Receipt printed successfully!")
-        }, 2000)
-
-        // In a real app, you would use the react-native-esc-pos-printer SDK:
-        // try {
-        //   // Create receipt content
-        //   const commands = [
-        //     { type: 'text', value: receiptTitle, align: 'center', weight: 'bold', width: 2, height: 2 },
-        //     { type: 'text', value: new Date().toLocaleString(), align: 'center' },
-        //     { type: 'text', value: '--------------------------------', align: 'center' },
-        //   ];
-        //
-        //   // Add items
-        //   receiptItems.forEach(item => {
-        //     commands.push({
-        //       type: 'text',
-        //       value: `${item.name} x${item.quantity}`,
-        //       align: 'left'
-        //     });
-        //     commands.push({
-        //       type: 'text',
-        //       value: `$${(parseFloat(item.price) * item.quantity).toFixed(2)}`,
-        //       align: 'right'
-        //     });
-        //   });
-        //
-        //   commands.push({ type: 'text', value: '--------------------------------', align: 'center' });
-        //   commands.push({
-        //     type: 'text',
-        //     value: `TOTAL: $${calculateTotal()}`,
-        //     align: 'right',
-        //     weight: 'bold'
-        //   });
-        //
-        //   // Print
-        //   await EscPosPrinter.print(commands);
-        //   Alert.alert('Success', 'Receipt printed successfully!');
-        // } catch (error) {
-        //   Alert.alert('Print Error', 'Failed to print receipt');
-        // } finally {
-        //   setIsPrinting(false);
-        // }
-    }
+        }
+    };
 
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
             <ScrollView contentContainerStyle={styles.scrollContent}>
                 <View style={[styles.printerInfo, { backgroundColor: theme.card, borderColor: theme.border }]}>
                     <Text style={[styles.printerInfoText, { color: theme.text }]}>
-                        Printing to: <Text style={{ fontWeight: "600" }}>{printerInfo.name}</Text>
+                        Printing to: <Text style={{ fontWeight: "600" }}>
+                            {printer.deviceName}
+                        </Text>
                     </Text>
                 </View>
 
