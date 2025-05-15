@@ -14,7 +14,7 @@
     "web:preview": "npx serve dist",
     "ts:check": "tsc",
     "lint": "eslint . --fix",
-    "clean": "npx expo prebuild --clean",
+    "prebuild": "npx expo prebuild --clean",
     "update": "npx expo install --check",
     "build:ios": "eas build -p ios --profile production",
     "submit": "eas submit --platform ios",
