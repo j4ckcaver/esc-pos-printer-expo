@@ -33,7 +33,7 @@ const PrinterSearchScreen = () => {
                 return {
                     ...baseFilter,
                     portType: DiscoveryFilterOption.PORTTYPE_BLUETOOTH,
-                    bondedDevices: DiscoveryFilterOption.TRUE,
+                    bondedDevices: DiscoveryFilterOption.FALSE,
                 } as const;
             case "network":
                 return {
