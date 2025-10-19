@@ -13,10 +13,11 @@ type TestPrinterPreset = {
 
 const TEST_PRINTER_PRESETS: TestPrinterPreset[] = [
     {
-        label: 'Mağaza Yazıcısı (BT)',
-        target: '00:47:50:35:10:DA', // telefonun BT taramasında gördüğü isim
-        macAddress: 'DC:1D:30:EC:91:40', // yazıcının BT adresi
+        label: 'Mağaza Yazıcısı (Bluetooth)',
+        target: 'BT:DC:1D:30:EC:91:40',
+        macAddress: 'DC:1D:30:EC:91:40',
         connection: 'bluetooth',
+        notes: 'Adresleri kendi yazıcınızın self-test çıktısına göre güncelleyin.',
     },
 ];
 
@@ -38,7 +39,7 @@ export const TEST_PRINTERS: AppPrinterInfo[] = TEST_PRINTER_PRESETS.reduce<AppPr
     acc.push({
         deviceName: sanitize(preset.label) || target,
         target,
-        deviceType: 'TYPE_PRINTER',
+        deviceType: 'BLUETOOTH_PRINTER',
         ipAddress: sanitize(preset.ipAddress),
         macAddress: sanitize(preset.macAddress),
         bdAddress: sanitize(preset.bdAddress),

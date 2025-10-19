@@ -1,12 +1,12 @@
 import type React from 'react';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useTheme } from '@/context/ThemeContext';
 import Button from '@/component/Button';
 import type { StackNavigation } from '@/navigators/RootNavigator';
-import { Printer, PrinterConstants } from 'react-native-esc-pos-printer';
+import { BluetoothEscposPrinter, BluetoothManager } from 'react-native-bluetooth-escpos-printer';
 import type { AppPrinterInfo } from '@/types/printer';
 
 const PrinterDetailsScreen = ({ route, navigation }: { route: { params: { printer: AppPrinterInfo } }; navigation: StackNavigation }) => {
@@ -17,80 +17,68 @@ const PrinterDetailsScreen = ({ route, navigation }: { route: { params: { printe
     const connectionHint = printer.connectionHint ?? (printer.target?.toLowerCase().startsWith('bt:') ? 'bluetooth' : 'network');
     const connectionLabel = connectionHint === 'bluetooth' ? 'Bluetooth' : 'Network';
 
-    const printerInstance = useMemo(() => {
-        return new Printer({
-            target: printer.target,
-            deviceName: printer.deviceName,
-        });
-    }, [printer]);
+    const bluetoothAddress = useMemo(() => {
+        if (printer.macAddress) return printer.macAddress;
+        const match = printer.target?.match(/bt[:\-]?(.+)/i);
+        return match?.[1];
+    }, [printer.macAddress, printer.target]);
 
-    const connectToPrinter = async () => {
+    const connectToPrinter = useCallback(async () => {
+        if (connectionHint !== 'bluetooth') {
+            Alert.alert('Bağlantı türü desteklenmiyor', 'Bu demo şu anda sadece Bluetooth yazıcıları destekliyor.');
+            return;
+        }
+
+        if (!bluetoothAddress) {
+            Alert.alert('Bluetooth Bilgisi Eksik', 'Yazıcının Bluetooth adresi bulunamadı. Test profilini güncelleyin.');
+            return;
+        }
+
         setIsConnecting(true);
 
         try {
-            await printerInstance.addQueueTask(async () => {
-                await printerInstance.connect();
-                const status = await printerInstance.getStatus();
-                const printerOnline = status.connection.statusCode === PrinterConstants.TRUE;
-                setIsConnected(printerOnline);
+            await BluetoothManager.connect(bluetoothAddress);
+            setIsConnected(true);
 
-                if (!printerOnline) {
-                    throw new Error('PRINTER_OFFLINE');
-                }
+            await BluetoothEscposPrinter.printerInit();
+            await BluetoothEscposPrinter.printerAlign(BluetoothEscposPrinter.ALIGN.CENTER);
+            await BluetoothEscposPrinter.printText('Printer Connected Successfully!\r\n\r\n', { encoding: 'UTF-8' });
 
-                await printerInstance.addTextAlign(PrinterConstants.ALIGN_CENTER);
-                await printerInstance.addTextSize({ width: 1, height: 1 });
-                await printerInstance.addText('Printer Connected Successfully!');
-                await printerInstance.addFeedLine(2);
+            await BluetoothEscposPrinter.printerAlign(BluetoothEscposPrinter.ALIGN.LEFT);
+            await BluetoothEscposPrinter.printText(`Device Name: ${printer.deviceName}\r\n`, { encoding: 'UTF-8' });
+            await BluetoothEscposPrinter.printText(`MAC Address: ${printer.macAddress ?? 'Unknown'}\r\n`, { encoding: 'UTF-8' });
+            await BluetoothEscposPrinter.printText(`Target: ${printer.target}\r\n`, { encoding: 'UTF-8' });
+            await BluetoothEscposPrinter.printText('\r\n', { encoding: 'UTF-8' });
 
-                // Line Separator
-                await printerInstance.addText('-'.repeat(32));
-                await printerInstance.addFeedLine();
-
-                await printerInstance.addTextSize({ width: 1, height: 1 });
-                await printerInstance.addText(
-                    `Device Name: ${printer.deviceName} \n Mac address: ${
-                        printer.macAddress ? printer.macAddress : 'Not found'
-                    } \n Target: ${printer.target} \n`
-                );
-                await printerInstance.addFeedLine();
-
-                // Line Separator
-                await printerInstance.addText('-'.repeat(32));
-                await printerInstance.addFeedLine(2);
-
-                await printerInstance.addTextAlign(PrinterConstants.ALIGN_CENTER);
-                await printerInstance.addTextSize({ width: 2, height: 2 });
-                await printerInstance.addText('WELCOME!');
-                await printerInstance.addFeedLine(3);
-
-                await printerInstance.addCut();
-                await printerInstance.sendData();
+            await BluetoothEscposPrinter.printerAlign(BluetoothEscposPrinter.ALIGN.CENTER);
+            await BluetoothEscposPrinter.printText('WELCOME!\r\n\r\n', {
+                encoding: 'UTF-8',
+                codepage: 0,
+                widthtimes: 2,
+                heigthtimes: 2,
+                fonttype: 1,
             });
+
+            await BluetoothEscposPrinter.printText('\r\n\r\n', { encoding: 'UTF-8' });
         } catch (error) {
             setIsConnected(false);
-            try {
-                await printerInstance.disconnect();
-            } catch (disconnectError) {
-                console.log('Disconnect error: ', disconnectError);
-            }
             console.log('Error: ', error);
-            Alert.alert('Printer Error', 'Printing failed');
+            Alert.alert('Printer Error', 'Bağlantı veya test baskısı başarısız oldu.');
         } finally {
             setIsConnecting(false);
         }
-    };
+    }, [bluetoothAddress, connectionHint, printer.deviceName, printer.macAddress, printer.target]);
 
-    const disconnectPrinter = async () => {
+    const disconnectPrinter = useCallback(async () => {
         try {
-            await printerInstance.disconnect();
+            await BluetoothManager.disconnect();
         } catch (error) {
             console.log('Disconnect error: ', error);
         } finally {
             setIsConnected(false);
             setIsConnecting(false);
         }
-    };
+    }, []);
 
     const navigateToPrint = () => {
         navigation.navigate('Print', { printer });
@@ -107,9 +95,7 @@ const PrinterDetailsScreen = ({ route, navigation }: { route: { params: { printe
 
                         <View style={styles.printerInfo}>
                             <Text style={[styles.printerName, { color: theme.text }]}>{printer?.deviceName || 'Printer'}</Text>
-                            <Text style={[styles.printerAddress, { color: theme.text + '99' }]}>
-                                {printer?.target || 'Unknown Address'}
-                            </Text>
+                            <Text style={[styles.printerAddress, { color: theme.text + '99' }]}>{printer?.target || 'Unknown Address'}</Text>
                             <View style={styles.statusContainer}>
                                 <View style={[styles.statusIndicator, { backgroundColor: isConnected ? theme.success : theme.border }]} />
                                 <Text style={[styles.statusText, { color: isConnected ? theme.success : theme.text + '99' }]}>
@@ -209,7 +195,8 @@ const DetailItem: React.FC<DetailItemProps> = ({ icon, label, value, theme }) =>
                     {
                         color: theme.text + '99',
                     },
-                ]}>
+                ]}
+            >
                 {label}
             </Text>
             <Text
@@ -218,7 +205,8 @@ const DetailItem: React.FC<DetailItemProps> = ({ icon, label, value, theme }) =>
                     {
                         color: theme.text,
                     },
-                ]}>
+                ]}
+            >
                 {value}
             </Text>
         </View>
@@ -245,7 +233,6 @@ const styles = StyleSheet.create({
     },
     printerHeader: {
         flexDirection: 'row',
-        alignItems: 'center',
     },
     iconContainer: {
         width: 64,
@@ -259,51 +246,50 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     printerName: {
-        fontSize: 18,
-        fontWeight: '600',
+        fontSize: 20,
+        fontWeight: '700',
         marginBottom: 4,
     },
     printerAddress: {
         fontSize: 14,
-        marginBottom: 8,
-    },
-    metaContainer: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        marginTop: 8,
-    },
-    metaPill: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 12,
-        marginRight: 8,
-        marginTop: 8,
-    },
-    metaText: {
-        fontSize: 12,
-        fontWeight: '600',
-        marginLeft: 4,
-    },
-    printerNotes: {
-        marginTop: 12,
-        fontSize: 13,
-        lineHeight: 18,
     },
     statusContainer: {
         flexDirection: 'row',
         alignItems: 'center',
+        marginTop: 8,
     },
     statusIndicator: {
         width: 8,
         height: 8,
         borderRadius: 4,
-        marginRight: 6,
+        marginRight: 8,
     },
     statusText: {
         fontSize: 12,
-        fontWeight: '500',
+        fontWeight: '600',
+    },
+    metaContainer: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+        marginTop: 8,
+    },
+    metaPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 12,
+        gap: 4,
+    },
+    metaText: {
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    printerNotes: {
+        marginTop: 12,
+        fontSize: 14,
+        lineHeight: 20,
     },
     detailsCard: {
         borderRadius: 12,
@@ -318,18 +304,16 @@ const styles = StyleSheet.create({
     },
     sectionTitle: {
         fontSize: 18,
-        fontWeight: '600',
+        fontWeight: '700',
         marginBottom: 16,
     },
     detailsGrid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        marginHorizontal: -8,
+        gap: 12,
     },
     detailItem: {
-        width: '50%',
-        paddingHorizontal: 8,
-        marginBottom: 16,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
     },
     detailIconContainer: {
         width: 32,
@@ -337,21 +321,21 @@ const styles = StyleSheet.create({
         borderRadius: 16,
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 8,
     },
     detailLabel: {
-        fontSize: 12,
-        marginBottom: 4,
+        fontSize: 14,
+        flex: 1,
     },
     detailValue: {
-        fontSize: 16,
-        fontWeight: '500',
+        fontSize: 14,
+        fontWeight: '600',
     },
     actionsContainer: {
-        marginBottom: 24,
+        gap: 12,
+        marginTop: 12,
     },
     actionButton: {
-        marginBottom: 12,
+        width: '100%',
     },
 });
 
