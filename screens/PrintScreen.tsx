@@ -4,10 +4,11 @@ import { SafeAreaView } from "react-native-safe-area-context"
 import { Feather } from "@expo/vector-icons"
 import { useTheme } from "@/context/ThemeContext"
 import Button from "@/component/Button"
-import { Printer, PrinterConstants, type DeviceInfo } from "react-native-esc-pos-printer"
+import { Printer, PrinterConstants } from "react-native-esc-pos-printer"
+import type { AppPrinterInfo } from "@/types/printer"
 
-const PrintScreen = ({ navigation, route }: { navigation: any; route: any }) => {
-    const printer: DeviceInfo = route.params.printer;
+const PrintScreen = ({ navigation, route }: { navigation: any; route: { params: { printer: AppPrinterInfo } } }) => {
+    const printer = route.params.printer;
     const { theme } = useTheme();
     const [isPrinting, setIsPrinting] = useState(false);
 

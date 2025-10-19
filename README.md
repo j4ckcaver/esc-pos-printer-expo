@@ -20,4 +20,8 @@ This app is ideal for retail POS systems, restaurant order slips, or any on-the-
 - 🔐 AsyncStorage integration for persistence
 - 🛠️ Developer productivity scripts (linting, type checks, cleaning, etc.)
 
+### 🔧 Test printer presets
+
+For quick testing you can pre-fill printer details (name, target, MAC, PIN, notes, etc.) inside `config/testPrinters.ts`. Populate the sample array with your own devices and they will appear alongside discovered printers, marked as “Test” in the UI.
+
 ---

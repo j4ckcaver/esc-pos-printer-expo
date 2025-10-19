@@ -38,6 +38,8 @@
           "fetch",
           "remote-notification"
         ],
+        "NSBluetoothAlwaysUsageDescription": "Need Bluetooth access to scan and connect to receipt printers.",
+        "NSBluetoothPeripheralUsageDescription": "Bluetooth access is required to communicate with receipt printers.",
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": true
         }
@@ -52,7 +54,14 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#000000"
       },
-      "package": "com.saqoora.escposprinterexpo"
+      "package": "com.saqoora.escposprinterexpo",
+      "permissions": [
+        "android.permission.BLUETOOTH_SCAN",
+        "android.permission.BLUETOOTH_CONNECT",
+        "android.permission.BLUETOOTH_ADMIN",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -72,7 +81,7 @@
     ],
     "extra": {
       "eas": {
-        "projectId": ""
+        "projectId": "821bdab7-b88e-4997-a32b-af82da5e0b61"
       }
     }
   }
