@@ -1,11 +1,11 @@
-import { useMemo, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TextInput, Alert } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { Feather } from "@expo/vector-icons";
-import { useTheme } from "@/context/ThemeContext";
-import Button from "@/component/Button";
-import { BluetoothEscposPrinter, BluetoothManager } from "react-native-bluetooth-escpos-printer";
-import type { AppPrinterInfo } from "@/types/printer";
+import { useMemo, useState } from "react"
+import { View, Text, StyleSheet, ScrollView, TextInput, Alert } from "react-native"
+import { SafeAreaView } from "react-native-safe-area-context"
+import { Feather } from "@expo/vector-icons"
+import { useTheme } from "@/context/ThemeContext"
+import Button from "@/component/Button"
+import { Printer, PrinterConstants } from "react-native-esc-pos-printer"
+import type { AppPrinterInfo } from "@/types/printer"
 
 const PrintScreen = ({ navigation, route }: { navigation: any; route: { params: { printer: AppPrinterInfo } } }) => {
     const printer = route.params.printer;
@@ -21,100 +21,108 @@ const PrintScreen = ({ navigation, route }: { navigation: any; route: { params: 
     const [newItemPrice, setNewItemPrice] = useState("");
     const [newItemQuantity, setNewItemQuantity] = useState("1");
 
-    const bluetoothAddress = useMemo(() => {
-        if (printer?.macAddress) return printer.macAddress;
-        const match = printer?.target?.match(/bt[:\-]?(.+)/i);
-        return match?.[1];
+    const printerInstance = useMemo(() => {
+        return new Printer({
+            target: printer.target,
+            deviceName: printer.deviceName
+        });
     }, [printer]);
 
     const addItem = () => {
         if (!newItemName || !newItemPrice) {
-            Alert.alert("Error", "Please enter item name and price");
-            return;
+            Alert.alert("Error", "Please enter item name and price")
+            return
         }
 
-        const quantity = Number.parseInt(newItemQuantity) || 1;
+        const quantity = Number.parseInt(newItemQuantity) || 1
 
-        setReceiptItems([...receiptItems, { name: newItemName, price: newItemPrice, quantity }]);
+        setReceiptItems([...receiptItems, { name: newItemName, price: newItemPrice, quantity }])
 
-        setNewItemName("");
-        setNewItemPrice("");
-        setNewItemQuantity("1");
+        // Clear inputs
+        setNewItemName("")
+        setNewItemPrice("")
+        setNewItemQuantity("1")
     };
 
     const removeItem = (index: number) => {
-        const updatedItems = [...receiptItems];
-        updatedItems.splice(index, 1);
-        setReceiptItems(updatedItems);
+        const updatedItems = [...receiptItems]
+        updatedItems.splice(index, 1)
+        setReceiptItems(updatedItems)
     };
 
     const calculateTotal = () => {
         return receiptItems
             .reduce((total, item) => {
-                return total + Number.parseFloat(item.price) * item.quantity;
+                return total + Number.parseFloat(item.price) * item.quantity
             }, 0)
-            .toFixed(2);
+            .toFixed(2)
     };
 
     const printReceipt = async () => {
-        if (!bluetoothAddress) {
-            Alert.alert("Bluetooth Error", "Yazıcının Bluetooth adresi bulunamadı. Test profilini güncelleyin.");
-            return;
-        }
-
         setIsPrinting(true);
 
         try {
-            const isEnabled = await BluetoothManager.isBluetoothEnabled();
-            if (!isEnabled) {
-                await BluetoothManager.enableBluetooth();
-            }
+            const res = await printerInstance.addQueueTask(async () => {
+                await Printer.tryToConnectUntil(
+                    printerInstance,
+                    status => status.online.statusCode === PrinterConstants.TRUE,
+                );
 
-            try {
-                await BluetoothManager.connect(bluetoothAddress);
-            } catch (connectionError) {
-                console.warn("Bluetooth reconnect attempt:", connectionError);
-            }
+                // header
+                await printerInstance.addTextSmooth(PrinterConstants.TRUE);
+                await printerInstance.addTextAlign(PrinterConstants.ALIGN_LEFT);
+                await printerInstance.addTextStyle({ em: PrinterConstants.TRUE } as const);
+                await printerInstance.addTextSize({ width: 2, height: 2 });
+                await printerInstance.addText(receiptTitle);
+                await printerInstance.addFeedLine(2);
 
-            await BluetoothEscposPrinter.printerInit();
-            await BluetoothEscposPrinter.printerAlign(BluetoothEscposPrinter.ALIGN.CENTER);
-            await BluetoothEscposPrinter.printText(`${receiptTitle}\r\n`, {
-                encoding: "UTF-8",
-                widthtimes: 2,
-                heigthtimes: 2,
-                fonttype: 1,
+                await printerInstance.addTextStyle({ em: PrinterConstants.FALSE } as const);
+                await printerInstance.addTextSize({ width: 1, height: 1 });
+                await printerInstance.addText("Address here");
+                await printerInstance.addFeedLine(2);
+
+                // Item Details
+                for (const item of receiptItems) {
+                    await printerInstance.addTextStyle({ em: PrinterConstants.TRUE } as const);
+                    await Printer.addTextLine(printerInstance, {
+                        left: `${item.name} x${item.quantity}`,
+                        right: `$${item.price}`,
+                    });
+                }
+
+                await printerInstance.addFeedLine(2);
+
+                await printerInstance.addTextAlign(PrinterConstants.ALIGN_CENTER);
+                await printerInstance.addTextSize({ width: 1, height: 1 });
+                await printerInstance.addText(`Total: $${calculateTotal()}`);
+                await printerInstance.addFeedLine(2);
+
+                await printerInstance.addTextAlign(PrinterConstants.ALIGN_CENTER);
+                await printerInstance.addTextSize({ width: 1, height: 1 });
+                await printerInstance.addText("Thank you!");
+                await printerInstance.addFeedLine(2);
+
+                await printerInstance.addTextAlign(PrinterConstants.ALIGN_CENTER);
+                await printerInstance.addTextSize({ width: 1, height: 1 });
+                await printerInstance.addText("Powered by React Native Esc Pos Printer");
+                await printerInstance.addFeedLine(2);
+
+                // Cut Paper
+                await printerInstance.addCut();
+
+                const result = await printerInstance.sendData();
+                await printerInstance.disconnect();
+                return result;
             });
 
-            await BluetoothEscposPrinter.printText(`${new Date().toLocaleString()}\r\n\r\n`, { encoding: "UTF-8" });
-
-            await BluetoothEscposPrinter.printerAlign(BluetoothEscposPrinter.ALIGN.LEFT);
-            for (const item of receiptItems) {
-                const line = `${item.name} x${item.quantity}`;
-                const price = `$${(Number.parseFloat(item.price) * item.quantity).toFixed(2)}`;
-                await BluetoothEscposPrinter.printText(`${line}\r\n${price}\r\n`, { encoding: "UTF-8" });
-                await BluetoothEscposPrinter.printText("\r\n", { encoding: "UTF-8" });
+            if (res) {
+                Alert.alert("Success", "Receipt printed successfully");
             }
-
-            await BluetoothEscposPrinter.printText("--------------------------------\r\n", { encoding: "UTF-8" });
-            await BluetoothEscposPrinter.printerAlign(BluetoothEscposPrinter.ALIGN.CENTER);
-            await BluetoothEscposPrinter.printText(`Total: $${calculateTotal()}\r\n\r\n`, { encoding: "UTF-8" });
-
-            await BluetoothEscposPrinter.printText("Thank you!\r\n", { encoding: "UTF-8" });
-            await BluetoothEscposPrinter.printText("Powered by React Native Bluetooth ESC/POS\r\n\r\n", { encoding: "UTF-8" });
-
-            await BluetoothEscposPrinter.printText("\r\n\r\n", { encoding: "UTF-8" });
-
-            Alert.alert("Success", "Receipt printed successfully");
-        } catch (error) {
-            console.log("Print error:", error);
-            Alert.alert("Error", "Printing failed");
+        } catch (e) {
+            await printerInstance.disconnect();
+            Alert.alert('Error', 'Printing failed');
         } finally {
-            try {
-                await BluetoothManager.disconnect();
-            } catch (disconnectError) {
-                console.log("Disconnect error:", disconnectError);
-            }
-            setIsPrinting(false);
+            setIsPrinting(false)
         }
     };
 
@@ -123,7 +131,9 @@ const PrintScreen = ({ navigation, route }: { navigation: any; route: { params: 
             <ScrollView contentContainerStyle={styles.scrollContent}>
                 <View style={[styles.printerInfo, { backgroundColor: theme.card, borderColor: theme.border }]}>
                     <Text style={[styles.printerInfoText, { color: theme.text }]}>
-                        Printing to: <Text style={{ fontWeight: "600" }}>{printer.deviceName}</Text>
+                        Printing to: <Text style={{ fontWeight: "600" }}>
+                            {printer.deviceName}
+                        </Text>
                     </Text>
                 </View>
 
@@ -227,12 +237,17 @@ const PrintScreen = ({ navigation, route }: { navigation: any; route: { params: 
                 </View>
 
                 <View style={styles.actionsContainer}>
-                    <Button title={isPrinting ? "Printing..." : "Print Receipt"} onPress={printReceipt} loading={isPrinting} />
+                    <Button
+                        title={isPrinting ? "Printing..." : "Print Receipt"}
+                        onPress={printReceipt}
+                        loading={isPrinting}
+                        style={styles.printButton}
+                    />
                 </View>
             </ScrollView>
         </SafeAreaView>
-    );
-};
+    )
+}
 
 const styles = StyleSheet.create({
     container: {
@@ -242,83 +257,84 @@ const styles = StyleSheet.create({
         padding: 16,
     },
     printerInfo: {
-        borderRadius: 12,
-        padding: 16,
-        borderWidth: 1,
+        borderRadius: 8,
+        padding: 12,
         marginBottom: 16,
+        borderWidth: 1,
+        flexDirection: "row",
+        alignItems: "center",
     },
     printerInfoText: {
-        fontSize: 16,
+        fontSize: 14,
     },
     receiptCard: {
         borderRadius: 12,
         padding: 16,
-        borderWidth: 1,
         marginBottom: 16,
+        borderWidth: 1,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 3,
+        elevation: 2,
     },
     sectionTitle: {
         fontSize: 18,
-        fontWeight: "700",
+        fontWeight: "600",
         marginBottom: 16,
     },
     receiptHeader: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
         marginBottom: 12,
     },
     receiptTitle: {
-        flex: 1,
-        marginRight: 12,
-        borderWidth: 1,
-        borderRadius: 8,
-        paddingHorizontal: 12,
-        paddingVertical: 8,
         fontSize: 18,
         fontWeight: "600",
+        textAlign: "center",
+        marginBottom: 8,
+        paddingVertical: 4,
+        borderBottomWidth: 1,
     },
     receiptDate: {
-        fontSize: 12,
+        fontSize: 14,
+        textAlign: "center",
     },
     divider: {
         height: 1,
         marginVertical: 12,
     },
     itemsContainer: {
-        gap: 12,
+        marginBottom: 12,
     },
     receiptItem: {
         flexDirection: "row",
         justifyContent: "space-between",
         alignItems: "center",
-        paddingVertical: 8,
+        marginBottom: 8,
     },
     itemInfo: {
         flex: 1,
-        marginRight: 12,
+        flexDirection: "row",
+        justifyContent: "space-between",
+        marginRight: 8,
     },
     itemName: {
         fontSize: 16,
-        fontWeight: "600",
-        marginBottom: 4,
     },
     itemPrice: {
-        fontSize: 14,
+        fontSize: 16,
+        fontWeight: "500",
     },
     removeButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        justifyContent: "center",
-        alignItems: "center",
-        paddingHorizontal: 0,
+        minWidth: 0,
+        paddingHorizontal: 8,
+        height: 32,
     },
     emptyItems: {
         alignItems: "center",
-        paddingVertical: 16,
+        paddingVertical: 24,
     },
     emptyText: {
-        fontSize: 14,
+        fontSize: 16,
     },
     totalContainer: {
         flexDirection: "row",
@@ -326,18 +342,23 @@ const styles = StyleSheet.create({
         alignItems: "center",
     },
     totalLabel: {
-        fontSize: 16,
-        fontWeight: "700",
+        fontSize: 18,
+        fontWeight: "600",
     },
     totalAmount: {
-        fontSize: 20,
+        fontSize: 18,
         fontWeight: "700",
     },
     addItemCard: {
         borderRadius: 12,
         padding: 16,
-        borderWidth: 1,
         marginBottom: 16,
+        borderWidth: 1,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 3,
+        elevation: 2,
     },
     addItemForm: {
         gap: 12,
@@ -347,25 +368,27 @@ const styles = StyleSheet.create({
         borderRadius: 8,
         paddingHorizontal: 12,
         paddingVertical: 10,
-        fontSize: 14,
+        fontSize: 16,
     },
     priceQuantityRow: {
         flexDirection: "row",
         gap: 12,
     },
     priceInput: {
-        flex: 1,
+        flex: 2,
     },
     quantityInput: {
-        width: 80,
+        flex: 1,
     },
     addButton: {
-        alignSelf: "flex-end",
+        marginTop: 4,
     },
     actionsContainer: {
-        gap: 12,
         marginBottom: 24,
     },
-});
+    printButton: {
+        backgroundColor: "#10B981",
+    },
+})
 
-export default PrintScreen;
+export default PrintScreen

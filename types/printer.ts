@@ -1,3 +1,5 @@
+import type { DeviceInfo } from "react-native-esc-pos-printer"
+
 export type PrinterConnectionHint = "bluetooth" | "network"
 
 export type PrinterMeta = {
@@ -7,13 +9,4 @@ export type PrinterMeta = {
     isTest?: boolean
 }
 
-export type BasePrinterInfo = {
-    deviceName: string
-    target: string
-    macAddress?: string
-    bdAddress?: string
-    ipAddress?: string
-    deviceType?: string
-}
-
-export type AppPrinterInfo = BasePrinterInfo & PrinterMeta
+export type AppPrinterInfo = DeviceInfo & PrinterMeta
